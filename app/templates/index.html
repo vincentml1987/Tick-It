@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Tick-It</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        form { margin-bottom: 1em; }
+        input, textarea { display: block; margin: 0.5em 0; width: 300px; }
+        ul { list-style: none; padding: 0; }
+        li { margin: 0.5em 0; cursor: pointer; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Tick-It</h1>
+
+    <div id="contacts-section">
+        <h2>Contacts</h2>
+        <ul id="contacts-list"></ul>
+        <h3>Create Contact</h3>
+        <form id="contact-form">
+            <input name="requester_name" placeholder="Name" required>
+            <input name="requester_email" placeholder="Email" required>
+            <input name="requester_phone" placeholder="Phone">
+            <textarea name="message" placeholder="Message"></textarea>
+            <button type="submit">Create</button>
+        </form>
+    </div>
+
+    <div id="deliverables-section" class="hidden">
+        <button id="back-btn">&laquo; Back</button>
+        <h2 id="contact-title"></h2>
+        <ul id="deliverables-list"></ul>
+        <h3>Add Deliverable</h3>
+        <form id="deliverable-form">
+            <input name="title" placeholder="Title" required>
+            <input name="priority" placeholder="Priority" value="Normal">
+            <input name="status" placeholder="Status" value="Pending">
+            <textarea name="description" placeholder="Description"></textarea>
+            <button type="submit">Add</button>
+        </form>
+    </div>
+
+<script>
+const contactsList = document.getElementById('contacts-list');
+const contactForm = document.getElementById('contact-form');
+const deliverableForm = document.getElementById('deliverable-form');
+const contactsSection = document.getElementById('contacts-section');
+const deliverablesSection = document.getElementById('deliverables-section');
+const deliverablesList = document.getElementById('deliverables-list');
+const contactTitle = document.getElementById('contact-title');
+const backBtn = document.getElementById('back-btn');
+
+let currentContactId = null;
+
+function contactIdFromCode(code) {
+    return parseInt(code.replace('CON', '')); 
+}
+
+function loadContacts() {
+    fetch('/api/contacts').then(r => r.json()).then(data => {
+        contactsList.innerHTML = '';
+        data.forEach(c => {
+            const li = document.createElement('li');
+            li.textContent = `${c.id} - ${c.requester_name}`;
+            li.addEventListener('click', () => showContact(contactIdFromCode(c.id), c.requester_name));
+            contactsList.appendChild(li);
+        });
+    });
+}
+
+function showContact(id, name) {
+    currentContactId = id;
+    contactTitle.textContent = `Contact: ${name}`;
+    fetch(`/api/contacts/${id}`).then(r => r.json()).then(data => {
+        deliverablesList.innerHTML = '';
+        data.deliverables.forEach(d => {
+            const li = document.createElement('li');
+            li.textContent = `${d.id} - ${d.title} (${d.status})`;
+            deliverablesList.appendChild(li);
+        });
+        contactsSection.classList.add('hidden');
+        deliverablesSection.classList.remove('hidden');
+    });
+}
+
+contactForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const formData = new FormData(contactForm);
+    const data = Object.fromEntries(formData.entries());
+    fetch('/api/contacts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(() => {
+        contactForm.reset();
+        loadContacts();
+    });
+});
+
+deliverableForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!currentContactId) return;
+    const formData = new FormData(deliverableForm);
+    const data = Object.fromEntries(formData.entries());
+    fetch(`/api/contacts/${currentContactId}/deliverables`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(() => {
+        deliverableForm.reset();
+        showContact(currentContactId, contactTitle.textContent.replace('Contact: ',''));
+    });
+});
+
+backBtn.addEventListener('click', () => {
+    deliverablesSection.classList.add('hidden');
+    contactsSection.classList.remove('hidden');
+    loadContacts();
+});
+
+loadContacts();
+</script>
+</body>
+</html>
